@@ -1,0 +1,86 @@
+<template>
+  <div>
+    <div class="page-title">
+      <h3>{{ this.$locale("Menu_Planning") }}</h3>
+      <h4>{{ this.$filters(info.bill) }}</h4>
+    </div>
+    <Loader v-if="loading" />
+
+    <h1 class="center" v-else-if="!categories.length">
+      {{ this.$locale("No_Сategories_Yet") }}
+      <router-link to="/categories">{{
+        this.$locale("Add_New_Сategory")
+      }}</router-link>
+    </h1>
+
+    <section v-else>
+      <div v-for="cat of categories" :key="cat.id">
+        <p>
+          <strong>{{ cat.name }}:</strong>
+          {{ this.$filters(cat.spend) }} из {{ this.$filters(cat.limit) }}
+        </p>
+        <div class="progress">
+          <div
+            class="determinate"
+            :class="[cat.progressColor]"
+            :style="{ width: cat.progressPercent + '%' }"
+          ></div>
+        </div>
+      </div>
+    </section>
+  </div>
+</template>
+
+<script>
+import { mapGetters } from "vuex";
+
+export default {
+  name: "Planning",
+  data() {
+    return {
+      loading: true,
+      categories: [],
+    };
+  },
+  computed: {
+    ...mapGetters(["info"]),
+  },
+  async mounted() {
+    //const records = await this.$store.dispatch("fetchRecords");
+    //const categoires = await this.$store.dispatch("categoriesAddArr");
+
+      await axios.get('http://finance-app/api/record').then(response => {
+          this.records = response.data.data
+      });
+
+      await axios.get('http://finance-app/api/category').then(response => {
+          this.categories = response.data.data
+      });
+      const records = this.records;
+      const categories = this.categories;
+
+    this.categories = categories.map((cat) => {
+      const spend = records
+        .filter((r) => r.category_id === cat.id)
+        .filter((r) => r.type === "outcome")
+        .reduce((total, record) => {
+          return (total += +record.amount);
+        }, 0);
+
+      const percent = (100 * spend) / cat.category_limit;
+      const progressPercent = percent > 100 ? 100 : percent;
+      const progressColor =
+        percent < 60 ? "green" : percent < 100 ? "yellow" : "red";
+
+      return {
+        ...cat,
+        progressPercent,
+        progressColor,
+        spend,
+      };
+    });
+
+    this.loading = false;
+  },
+};
+</script>
